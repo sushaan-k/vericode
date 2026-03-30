@@ -229,6 +229,16 @@ To actually run the proof verification (not just generate code), you need one or
 - **Dafny**: [Install Dafny](https://github.com/dafny-lang/dafny/wiki/INSTALL) (`brew install dafny` or `dotnet tool install dafny`)
 - **Verus**: [Install Verus](https://github.com/verus-lang/verus) (build from source)
 
+## Demo
+
+Run the offline walkthrough with:
+
+```bash
+uv run python examples/demo.py
+```
+
+For backend-specific flows, see the larger examples in `examples/`.
+
 ## Development
 
 ```bash
