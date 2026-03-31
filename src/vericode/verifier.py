@@ -249,7 +249,15 @@ async def verify(
     provider_name = provider.provider_name
     vcache = cache or VerificationCache()
     if use_cache:
-        key = cache_key(spec, backend_obj.name, provider_name)
+        key = cache_key(
+            spec,
+            backend_obj.name,
+            provider_name,
+            language=language,
+            existing_code=existing_code,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
         hit = vcache.get(key)
         if hit is not None:
             logger.info("Returning cached verification result")
@@ -315,7 +323,15 @@ async def verify(
 
     # --- Persist to cache on success ---
     if use_cache and output.verified and output.certificate is not None:
-        key = cache_key(spec, backend_obj.name, provider_name)
+        key = cache_key(
+            spec,
+            backend_obj.name,
+            provider_name,
+            language=language,
+            existing_code=existing_code,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
         entry = CacheEntry(
             cache_key=key,
             code=output.code,

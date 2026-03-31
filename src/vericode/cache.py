@@ -1,8 +1,8 @@
 """Content-addressed verification cache.
 
-Caches successful ``VerificationOutput`` results keyed by a hash of
-(spec + backend + provider) so that repeated runs with the same inputs
-can skip the expensive LLM + proof-assistant pipeline.
+Caches successful ``VerificationOutput`` results keyed by a hash of the
+full verification identity: spec, backend, provider, target language,
+and any user-supplied implementation under proof.
 """
 
 from __future__ import annotations
@@ -42,22 +42,40 @@ class CacheEntry:
     metadata: dict[str, str] = field(default_factory=dict)
 
 
-def cache_key(spec: Spec, backend: str, provider: str) -> str:
+def cache_key(
+    spec: Spec,
+    backend: str,
+    provider: str,
+    *,
+    language: str,
+    existing_code: str | None = None,
+    temperature: float,
+    max_tokens: int,
+) -> str:
     """Compute a content-addressed cache key.
 
     The key is a SHA-256 hex digest derived from the canonical spec
-    representation, the backend name, and the provider name.
+    representation plus every input that can change the resulting proof
+    artifact.
 
     Args:
         spec: The specification being verified.
         backend: Name of the verification backend.
         provider: Name of the LLM provider.
+        language: Target implementation language.
+        existing_code: Optional user-supplied implementation being proved.
+        temperature: Generation sampling temperature.
+        max_tokens: Generation token budget.
 
     Returns:
         A 64-character hex digest string.
     """
     canonical = canonical_spec(spec)
-    combined = f"{canonical}|{backend.lower()}|{provider.lower()}"
+    code_hash = sha256_hex(existing_code or "")
+    combined = (
+        f"{canonical}|{backend.lower()}|{provider.lower()}|"
+        f"{language.lower()}|{code_hash}|{temperature:.6f}|{max_tokens}"
+    )
     return sha256_hex(combined)
 
 

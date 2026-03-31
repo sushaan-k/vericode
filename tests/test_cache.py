@@ -18,40 +18,199 @@ class TestCacheKey:
     def test_deterministic(self) -> None:
         """Same inputs always produce the same key."""
         spec = Spec(description="Sort a list", function_name="sort")
-        k1 = cache_key(spec, "lean4", "anthropic")
-        k2 = cache_key(spec, "lean4", "anthropic")
+        k1 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        k2 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
         assert k1 == k2
 
     def test_different_backend_different_key(self) -> None:
         spec = Spec(description="Sort a list", function_name="sort")
-        k1 = cache_key(spec, "lean4", "anthropic")
-        k2 = cache_key(spec, "dafny", "anthropic")
+        k1 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        k2 = cache_key(
+            spec,
+            "dafny",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
         assert k1 != k2
 
     def test_different_provider_different_key(self) -> None:
         spec = Spec(description="Sort a list", function_name="sort")
-        k1 = cache_key(spec, "lean4", "anthropic")
-        k2 = cache_key(spec, "lean4", "openai")
+        k1 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        k2 = cache_key(
+            spec,
+            "lean4",
+            "openai",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
         assert k1 != k2
 
     def test_different_spec_different_key(self) -> None:
         spec_a = Spec(description="Sort a list", function_name="sort")
         spec_b = Spec(description="Search a list", function_name="search")
-        k1 = cache_key(spec_a, "lean4", "anthropic")
-        k2 = cache_key(spec_b, "lean4", "anthropic")
+        k1 = cache_key(
+            spec_a,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        k2 = cache_key(
+            spec_b,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
         assert k1 != k2
 
     def test_key_is_64_hex_chars(self) -> None:
         spec = Spec(description="Sort a list")
-        key = cache_key(spec, "lean4", "anthropic")
+        key = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
         assert len(key) == 64
         assert all(c in "0123456789abcdef" for c in key)
 
     def test_case_insensitive_backend_and_provider(self) -> None:
         spec = Spec(description="Sort a list")
-        k1 = cache_key(spec, "LEAN4", "Anthropic")
-        k2 = cache_key(spec, "lean4", "anthropic")
+        k1 = cache_key(
+            spec,
+            "LEAN4",
+            "Anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        k2 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
         assert k1 == k2
+
+    def test_different_language_different_key(self) -> None:
+        spec = Spec(description="Sort a list", function_name="sort")
+        k1 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        k2 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="rust",
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        assert k1 != k2
+
+    def test_different_existing_code_different_key(self) -> None:
+        spec = Spec(description="Sort a list", function_name="sort")
+        k1 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            existing_code="def sort(xs): return xs",
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        k2 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            existing_code="def sort(xs): return sorted(xs)",
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        assert k1 != k2
+
+    def test_different_temperature_different_key(self) -> None:
+        spec = Spec(description="Sort a list", function_name="sort")
+        k1 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.1,
+            max_tokens=4096,
+        )
+        k2 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.9,
+            max_tokens=4096,
+        )
+        assert k1 != k2
+
+    def test_different_max_tokens_different_key(self) -> None:
+        spec = Spec(description="Sort a list", function_name="sort")
+        k1 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=2048,
+        )
+        k2 = cache_key(
+            spec,
+            "lean4",
+            "anthropic",
+            language="python",
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        assert k1 != k2
 
 
 # ---------------------------------------------------------------------------
@@ -199,3 +358,69 @@ class TestCacheIntegration:
         )
         assert result.verified is True
         assert provider.call_count == 2  # LLM was called again
+
+    async def test_existing_code_uses_distinct_cache_entries(
+        self, tmp_path: Path
+    ) -> None:
+        """Different user-supplied implementations must not share cache hits."""
+        from tests.conftest import FakeBackend, FakeLLMProvider
+        from vericode.cache import VerificationCache
+        from vericode.verifier import verify
+
+        spec = Spec(description="Sort a list", function_name="sort")
+        provider = FakeLLMProvider()
+        backend = FakeBackend(succeed=True)
+        vc = VerificationCache(cache_dir=tmp_path / "cache")
+
+        result_one = await verify(
+            spec,
+            backend=backend,
+            provider=provider,
+            cache=vc,
+            existing_code="def sort(xs): return xs",
+        )
+        result_two = await verify(
+            spec,
+            backend=backend,
+            provider=provider,
+            cache=vc,
+            existing_code="def sort(xs): return sorted(xs)",
+        )
+
+        assert result_one.verified is True
+        assert result_two.verified is True
+        assert provider.call_count == 2
+
+    async def test_generation_settings_use_distinct_cache_entries(
+        self, tmp_path: Path
+    ) -> None:
+        """Different generation settings must not share cached artifacts."""
+        from tests.conftest import FakeBackend, FakeLLMProvider
+        from vericode.cache import VerificationCache
+        from vericode.verifier import verify
+
+        spec = Spec(description="Sort a list", function_name="sort")
+        provider = FakeLLMProvider()
+        backend = FakeBackend(succeed=True)
+        vc = VerificationCache(cache_dir=tmp_path / "cache")
+
+        first = await verify(
+            spec,
+            backend=backend,
+            provider=provider,
+            cache=vc,
+            temperature=0.1,
+            max_tokens=2048,
+        )
+        second = await verify(
+            spec,
+            backend=backend,
+            provider=provider,
+            cache=vc,
+            temperature=0.7,
+            max_tokens=4096,
+        )
+
+        assert first.verified is True
+        assert second.verified is True
+        assert provider.call_count == 2
