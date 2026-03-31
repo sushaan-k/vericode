@@ -21,6 +21,7 @@ def _isolate_cache(monkeypatch: pytest.MonkeyPatch) -> None:
         _cache_mod, "_DEFAULT_CACHE_DIR", Path(tempfile.mkdtemp()) / "vericode"
     )
 
+
 # ---------------------------------------------------------------------------
 # Fake / stub implementations for testing without real LLMs or proof tools
 # ---------------------------------------------------------------------------

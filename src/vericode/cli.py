@@ -114,7 +114,9 @@ def main(ctx: click.Context, verbose: bool) -> None:
     help="LLM provider.",
 )
 @click.option("--output", "-o", type=click.Path(), help="Write results to a file.")
-@click.option("--no-cache", is_flag=True, default=False, help="Skip verification cache.")
+@click.option(
+    "--no-cache", is_flag=True, default=False, help="Skip verification cache."
+)
 @click.pass_context
 def verify(
     ctx: click.Context,
