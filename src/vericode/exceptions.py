@@ -36,18 +36,38 @@ class GenerationError(VericodeError):
 
 
 class ProofCompilationError(VericodeError):
-    """Raised when a proof fails to compile in the backend proof assistant."""
+    """Raised when a proof fails to compile in the backend proof assistant.
+
+    Carries structured diagnostic information so callers can
+    programmatically inspect the failure without parsing strings.
+
+    Attributes:
+        backend_name: Canonical name of the backend that failed (e.g. ``"lean4"``).
+        source_file: Path to the temporary proof file that was compiled.
+        error_lines: Parsed list of individual error messages.
+        raw_output: Complete stdout + stderr from the compiler.
+    """
 
     def __init__(
         self,
         message: str,
         *,
+        backend_name: str = "",
+        source_file: str = "",
+        error_lines: list[str] | None = None,
+        raw_output: str = "",
+        # Keep old keyword for backward compat in call sites
         backend: str | None = None,
         compiler_output: str | None = None,
         details: str | None = None,
     ) -> None:
-        self.backend = backend
-        self.compiler_output = compiler_output
+        self.backend_name = backend_name or backend or ""
+        self.source_file = source_file
+        self.error_lines = error_lines or []
+        self.raw_output = raw_output or compiler_output or ""
+        # Preserve legacy attributes
+        self.backend = self.backend_name
+        self.compiler_output = self.raw_output
         super().__init__(message, details=details)
 
 
