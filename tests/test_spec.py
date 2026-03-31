@@ -72,6 +72,65 @@ class TestSpec:
 
 
 # ---------------------------------------------------------------------------
+# Complexity scoring tests
+# ---------------------------------------------------------------------------
+
+
+class TestComplexityScore:
+    """Tests for ``Spec.complexity_score()``."""
+
+    def test_minimal_spec_low_score(self) -> None:
+        """A bare-bones spec should have a very low complexity score."""
+        spec = Spec(description="Sort a list")
+        score = spec.complexity_score()
+        assert 0.0 <= score <= 0.15
+
+    def test_rich_spec_higher_score(self) -> None:
+        """A spec with many constraints should score higher."""
+        spec = Spec(
+            description="Merge two sorted lists into one sorted list " * 10,
+            postconditions=[
+                "is_sorted(result)",
+                "len(result) == len(a) + len(b)",
+                "is_permutation(result, a + b)",
+            ],
+            edge_cases=["a == []", "b == []", "len(a) == 1"],
+            preconditions=["is_sorted(a)", "is_sorted(b)"],
+            invariants=["len(merged) <= len(a) + len(b)"],
+        )
+        score = spec.complexity_score()
+        assert score > 0.5
+
+    def test_score_bounded_zero_to_one(self) -> None:
+        """Even an extreme spec must return a score in [0, 1]."""
+        spec = Spec(
+            description="x" * 2000,
+            postconditions=[f"p{i}" for i in range(20)],
+            edge_cases=[f"e{i}" for i in range(20)],
+            preconditions=[f"pre{i}" for i in range(20)],
+            invariants=[f"inv{i}" for i in range(20)],
+        )
+        score = spec.complexity_score()
+        assert score == 1.0
+
+    def test_empty_description_zero_desc_component(self) -> None:
+        """Description component should be zero for a very short description."""
+        spec = Spec(description="x")
+        score = spec.complexity_score()
+        # Only desc contributes and it's ~0.002 / 500 -> tiny
+        assert score < 0.01
+
+    def test_postconditions_are_dominant_factor(self) -> None:
+        """Postconditions have the highest weight (0.35)."""
+        base = Spec(description="Sort a list")
+        with_post = Spec(
+            description="Sort a list",
+            postconditions=["is_sorted(result)", "is_permutation(result, input)"],
+        )
+        assert with_post.complexity_score() > base.complexity_score()
+
+
+# ---------------------------------------------------------------------------
 # parse_spec tests
 # ---------------------------------------------------------------------------
 

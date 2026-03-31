@@ -45,6 +45,33 @@ class Spec(BaseModel):
     invariants: list[str] = Field(default_factory=list)
     edge_cases: list[str] = Field(default_factory=list)
 
+    def complexity_score(self) -> float:
+        """Estimate how difficult this spec is to verify.
+
+        The score is a float in [0, 1] computed from:
+        - Number of postconditions (weight 0.35)
+        - Number of edge cases (weight 0.25)
+        - Description length (weight 0.20)
+        - Number of preconditions (weight 0.10)
+        - Number of invariants (weight 0.10)
+
+        A higher score means the spec is expected to be harder to prove.
+        """
+        postcond_score = min(len(self.postconditions) / 5.0, 1.0)
+        edge_score = min(len(self.edge_cases) / 4.0, 1.0)
+        desc_score = min(len(self.description) / 500.0, 1.0)
+        precond_score = min(len(self.preconditions) / 4.0, 1.0)
+        invariant_score = min(len(self.invariants) / 3.0, 1.0)
+
+        raw = (
+            0.35 * postcond_score
+            + 0.25 * edge_score
+            + 0.20 * desc_score
+            + 0.10 * precond_score
+            + 0.10 * invariant_score
+        )
+        return round(min(raw, 1.0), 4)
+
     @model_validator(mode="after")
     def _infer_function_name(self) -> Spec:
         """Best-effort extraction of a function name from the description."""

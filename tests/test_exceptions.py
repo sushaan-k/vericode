@@ -59,6 +59,34 @@ class TestProofCompilationError:
         err = ProofCompilationError("fail", compiler_output="error: unsolved goals")
         assert err.compiler_output == "error: unsolved goals"
 
+    def test_structured_fields(self) -> None:
+        err = ProofCompilationError(
+            "compilation failed",
+            backend_name="dafny",
+            source_file="/tmp/proof.dfy",
+            error_lines=["Error: postcondition", "Error: assertion"],
+            raw_output="full compiler output here",
+        )
+        assert err.backend_name == "dafny"
+        assert err.source_file == "/tmp/proof.dfy"
+        assert len(err.error_lines) == 2
+        assert err.raw_output == "full compiler output here"
+        # Legacy aliases
+        assert err.backend == "dafny"
+        assert err.compiler_output == "full compiler output here"
+
+    def test_backend_name_fallback_to_backend(self) -> None:
+        """If only legacy 'backend' kwarg is passed, backend_name mirrors it."""
+        err = ProofCompilationError("fail", backend="verus")
+        assert err.backend_name == "verus"
+
+    def test_defaults_for_structured_fields(self) -> None:
+        err = ProofCompilationError("fail")
+        assert err.backend_name == ""
+        assert err.source_file == ""
+        assert err.error_lines == []
+        assert err.raw_output == ""
+
 
 class TestBackendNotFoundError:
     def test_message_includes_backend(self) -> None:

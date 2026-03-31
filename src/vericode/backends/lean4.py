@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from vericode.backends.base import VerificationBackend, VerificationResult
+from vericode.exceptions import ProofCompilationError
 
 logger = logging.getLogger(__name__)
 
@@ -71,21 +72,23 @@ class Lean4Backend(VerificationBackend):
                 proc.communicate(), timeout=self.timeout
             )
         except FileNotFoundError:
-            return VerificationResult(
-                success=False,
-                compiler_output="",
-                errors=["lean binary not found on PATH"],
-                backend=self.name,
-            )
+            raise ProofCompilationError(
+                "lean binary not found on PATH",
+                backend_name=self.name,
+                source_file=str(tmp_path),
+                error_lines=["lean binary not found on PATH"],
+                raw_output="",
+            ) from None
         except TimeoutError:
             proc.kill()
             await proc.wait()
-            return VerificationResult(
-                success=False,
-                compiler_output="",
-                errors=[f"lean verification timed out after {self.timeout}s"],
-                backend=self.name,
-            )
+            raise ProofCompilationError(
+                f"lean verification timed out after {self.timeout}s",
+                backend_name=self.name,
+                source_file=str(tmp_path),
+                error_lines=[f"lean verification timed out after {self.timeout}s"],
+                raw_output="",
+            ) from None
         finally:
             tmp_path.unlink(missing_ok=True)
 
@@ -93,10 +96,19 @@ class Lean4Backend(VerificationBackend):
         output = (stdout_bytes.decode() + "\n" + stderr_bytes.decode()).strip()
         errors = _parse_lean_errors(output)
 
+        if proc.returncode != 0 or len(errors) > 0:
+            raise ProofCompilationError(
+                f"Lean 4 proof compilation failed with {len(errors)} error(s)",
+                backend_name=self.name,
+                source_file=str(tmp_path),
+                error_lines=errors,
+                raw_output=output,
+            )
+
         return VerificationResult(
-            success=proc.returncode == 0 and len(errors) == 0,
+            success=True,
             compiler_output=output,
-            errors=errors,
+            errors=[],
             elapsed_seconds=elapsed,
             backend=self.name,
         )

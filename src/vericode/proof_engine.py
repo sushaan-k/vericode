@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 from vericode.artifacts import bound_proof_source
 from vericode.backends.base import VerificationBackend, VerificationResult
-from vericode.exceptions import RefinementExhaustedError
+from vericode.exceptions import ProofCompilationError, RefinementExhaustedError
 from vericode.generator import DualGenerationResult, DualGenerator
 from vericode.spec import Spec
 
@@ -152,9 +152,19 @@ class ProofEngine:
 
             # --- Verify ---
             verification_source = bound_proof_source(spec, code, proof, backend_name)
-            vresult: VerificationResult = await self._backend.verify(
-                verification_source
-            )
+            try:
+                vresult: VerificationResult = await self._backend.verify(
+                    verification_source
+                )
+            except ProofCompilationError as exc:
+                # Convert structured exception to a VerificationResult so the
+                # refinement loop can feed errors back to the LLM.
+                vresult = VerificationResult(
+                    success=False,
+                    compiler_output=exc.raw_output,
+                    errors=exc.error_lines or [str(exc)],
+                    backend=exc.backend_name or backend_name,
+                )
 
             attempt = RefinementAttempt(
                 iteration=iteration,

@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from vericode.artifacts import bound_proof_source, canonical_spec, sha256_hex
 from vericode.backends import VerificationBackend, get_backend
+from vericode.cache import CacheEntry, VerificationCache, cache_key
 from vericode.exceptions import RefinementExhaustedError
 from vericode.generator import DualGenerator
 from vericode.models.base import LLMProvider
@@ -21,6 +23,9 @@ from vericode.proof_engine import ProofEngine, RefinementResult
 from vericode.spec import Spec, parse_spec
 
 logger = logging.getLogger(__name__)
+
+# A progress callback receives (stage_name, current_step, total_steps).
+ProgressCallback = Callable[[str, int, int], None]
 
 
 @dataclass
@@ -162,6 +167,17 @@ def _build_bound_artifact(
     return _sha256(_spec_canonical(spec)), _sha256(code), proof_source
 
 
+def _notify(
+    callback: ProgressCallback | None,
+    stage: str,
+    current: int,
+    total: int,
+) -> None:
+    """Fire the progress callback if one is registered."""
+    if callback is not None:
+        callback(stage, current, total)
+
+
 async def verify(
     spec_input: str | Spec,
     *,
@@ -172,6 +188,9 @@ async def verify(
     temperature: float = 0.2,
     max_tokens: int = 4096,
     existing_code: str | None = None,
+    use_cache: bool = True,
+    cache: VerificationCache | None = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> VerificationOutput:
     """Run the full vericode pipeline.
 
@@ -196,6 +215,10 @@ async def verify(
         max_tokens: Max tokens per LLM call.
         existing_code: If provided, generate a proof for this code instead
             of generating new code.
+        use_cache: When ``True`` (default), look up and store results in
+            the verification cache.
+        cache: An explicit ``VerificationCache`` instance.  When ``None``
+            the default file-backed cache is used.
 
     Returns:
         A ``VerificationOutput`` with verified code and a proof certificate
@@ -222,11 +245,41 @@ async def verify(
 
         provider = AnthropicProvider()
 
+    # --- Check cache ---
+    provider_name = provider.provider_name
+    vcache = cache or VerificationCache()
+    if use_cache:
+        key = cache_key(
+            spec,
+            backend_obj.name,
+            provider_name,
+            language=language,
+            existing_code=existing_code,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        hit = vcache.get(key)
+        if hit is not None:
+            logger.info("Returning cached verification result")
+            cert_data = json.loads(hit.certificate_json)
+            certificate = ProofCertificate(**cert_data)
+            return VerificationOutput(
+                code=hit.code,
+                proof=hit.proof,
+                verified=True,
+                iterations=0,
+                certificate=certificate,
+                backend=hit.backend,
+                language=hit.language,
+            )
+
     # --- Build pipeline ---
+    _notify(progress_callback, "setup", 1, 3)
     generator = DualGenerator(provider, temperature=temperature, max_tokens=max_tokens)
     engine = ProofEngine(generator, backend_obj, max_iterations=max_iterations)
 
     # --- Execute ---
+    _notify(progress_callback, "generating", 2, 3)
     logger.info(
         "Starting verification pipeline",
         extra={
@@ -255,9 +308,10 @@ async def verify(
             ],
         )
 
+    _notify(progress_callback, "verified", 3, 3)
     certificate = _build_certificate(spec, result.code, result.proof, backend_obj.name)
 
-    return VerificationOutput(
+    output = VerificationOutput(
         code=result.code,
         proof=result.proof,
         verified=result.success,
@@ -266,3 +320,26 @@ async def verify(
         backend=backend_obj.name,
         language=language,
     )
+
+    # --- Persist to cache on success ---
+    if use_cache and output.verified and output.certificate is not None:
+        key = cache_key(
+            spec,
+            backend_obj.name,
+            provider_name,
+            language=language,
+            existing_code=existing_code,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        entry = CacheEntry(
+            cache_key=key,
+            code=output.code,
+            proof=output.proof,
+            backend=output.backend,
+            language=output.language,
+            certificate_json=output.certificate.to_json(),
+        )
+        vcache.put(entry)
+
+    return output

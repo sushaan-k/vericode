@@ -2,11 +2,25 @@
 
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from vericode.backends.base import VerificationBackend, VerificationResult
 from vericode.models.base import GenerationResponse, LLMProvider
 from vericode.spec import Spec
+
+
+@pytest.fixture(autouse=True)
+def _isolate_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Redirect the verification cache to a temp dir for every test."""
+    import vericode.cache as _cache_mod
+
+    monkeypatch.setattr(
+        _cache_mod, "_DEFAULT_CACHE_DIR", Path(tempfile.mkdtemp()) / "vericode"
+    )
+
 
 # ---------------------------------------------------------------------------
 # Fake / stub implementations for testing without real LLMs or proof tools
