@@ -100,6 +100,7 @@ class TestVerifyPipeline:
             backend=backend,
             provider=provider,
             max_iterations=3,
+
         )
 
         assert result.verified is True
@@ -120,6 +121,7 @@ class TestVerifyPipeline:
             backend=backend,
             provider=provider,
             max_iterations=2,
+
         )
 
         assert result.verified is False
@@ -136,6 +138,7 @@ class TestVerifyPipeline:
             language="python",
             backend=backend,
             provider=provider,
+
         )
 
         assert result.verified is True
@@ -152,6 +155,7 @@ class TestVerifyPipeline:
             backend=backend,
             provider=provider,
             max_iterations=5,
+
         )
 
         assert result.verified is True
@@ -165,6 +169,7 @@ class TestVerifyPipeline:
             sort_spec,
             backend=backend,
             provider=provider,
+
         )
 
         assert result.certificate is not None
@@ -181,6 +186,7 @@ class TestVerifyPipeline:
             sort_spec,
             backend=backend,
             provider=provider,
+
         )
 
         assert result.certificate is not None
@@ -228,6 +234,7 @@ class TestVerifyPipeline:
             backend="lean4",
             provider=provider,
             max_iterations=1,
+
         )
 
         # We expect failure since lean4 is not installed, but no crash
@@ -246,6 +253,7 @@ class TestVerifyPipeline:
             provider=provider,
             existing_code="def original(lst): return lst",
             max_iterations=3,
+
         )
 
         assert result.verified is True

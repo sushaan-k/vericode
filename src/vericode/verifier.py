@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 
 from vericode.artifacts import bound_proof_source, canonical_spec, sha256_hex
 from vericode.backends import VerificationBackend, get_backend
+from vericode.cache import CacheEntry, VerificationCache, cache_key
 from vericode.exceptions import RefinementExhaustedError
 from vericode.generator import DualGenerator
 from vericode.models.base import LLMProvider
@@ -172,6 +173,8 @@ async def verify(
     temperature: float = 0.2,
     max_tokens: int = 4096,
     existing_code: str | None = None,
+    use_cache: bool = True,
+    cache: VerificationCache | None = None,
 ) -> VerificationOutput:
     """Run the full vericode pipeline.
 
@@ -196,6 +199,10 @@ async def verify(
         max_tokens: Max tokens per LLM call.
         existing_code: If provided, generate a proof for this code instead
             of generating new code.
+        use_cache: When ``True`` (default), look up and store results in
+            the verification cache.
+        cache: An explicit ``VerificationCache`` instance.  When ``None``
+            the default file-backed cache is used.
 
     Returns:
         A ``VerificationOutput`` with verified code and a proof certificate
@@ -221,6 +228,26 @@ async def verify(
         from vericode.models.anthropic_provider import AnthropicProvider
 
         provider = AnthropicProvider()
+
+    # --- Check cache ---
+    provider_name = provider.provider_name
+    vcache = cache or VerificationCache()
+    if use_cache:
+        key = cache_key(spec, backend_obj.name, provider_name)
+        hit = vcache.get(key)
+        if hit is not None:
+            logger.info("Returning cached verification result")
+            cert_data = json.loads(hit.certificate_json)
+            certificate = ProofCertificate(**cert_data)
+            return VerificationOutput(
+                code=hit.code,
+                proof=hit.proof,
+                verified=True,
+                iterations=0,
+                certificate=certificate,
+                backend=hit.backend,
+                language=hit.language,
+            )
 
     # --- Build pipeline ---
     generator = DualGenerator(provider, temperature=temperature, max_tokens=max_tokens)
@@ -257,7 +284,7 @@ async def verify(
 
     certificate = _build_certificate(spec, result.code, result.proof, backend_obj.name)
 
-    return VerificationOutput(
+    output = VerificationOutput(
         code=result.code,
         proof=result.proof,
         verified=result.success,
@@ -266,3 +293,18 @@ async def verify(
         backend=backend_obj.name,
         language=language,
     )
+
+    # --- Persist to cache on success ---
+    if use_cache and output.verified and output.certificate is not None:
+        key = cache_key(spec, backend_obj.name, provider_name)
+        entry = CacheEntry(
+            cache_key=key,
+            code=output.code,
+            proof=output.proof,
+            backend=output.backend,
+            language=output.language,
+            certificate_json=output.certificate.to_json(),
+        )
+        vcache.put(entry)
+
+    return output

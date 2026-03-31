@@ -51,6 +51,7 @@ class TestDataStructureVerification:
             language="python",
             backend=backend,
             provider=provider,
+
         )
 
         assert result.verified is True
@@ -85,6 +86,7 @@ class TestDataStructureVerification:
             ),
             backend=backend,
             provider=provider,
+
         )
 
         assert result.verified is True
@@ -99,6 +101,7 @@ class TestDataStructureVerification:
             backend=backend,
             provider=provider,
             max_iterations=5,
+
         )
 
         assert result.verified is True
@@ -118,6 +121,7 @@ class TestDataStructureVerification:
             spec,
             backend=backend,
             provider=provider,
+
         )
 
         assert result.verified is True
